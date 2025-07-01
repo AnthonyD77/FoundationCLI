@@ -68,7 +68,7 @@ export async function createContentGeneratorConfig(
   };
 
   // if we are using google auth nothing else to validate for now
-  if (authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
+  if (authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL || authType === AuthType.USE_CUSTOM_MODEL) {
     return contentGeneratorConfig;
   }
 
@@ -99,15 +99,16 @@ export async function createContentGeneratorConfig(
     return contentGeneratorConfig;
   }
 
-  const customApiKey = process.env.CUSTOM_API_KEY || process.env.OPENAI_API_KEY;
-  const customApiBaseUrl = process.env.CUSTOM_API_BASE_URL || 'https://api.openai.com/v1';
-
-  if (authType === AuthType.USE_CUSTOM_MODEL && customApiKey) {
-    contentGeneratorConfig.apiKey = customApiKey;
-    contentGeneratorConfig.apiBaseUrl = customApiBaseUrl;
-    // 不需要检查模型可用性，直接使用配置的模型
-    return contentGeneratorConfig;
-  }
+  // // custom settings
+  // const customApiKey = process.env.CUSTOM_API_KEY || process.env.OPENAI_API_KEY;
+  // const customApiBaseUrl = process.env.CUSTOM_API_BASE_URL || 'https://api.openai.com/v1';
+  //
+  // if (authType === AuthType.USE_CUSTOM_MODEL && customApiKey) {
+  //   contentGeneratorConfig.apiKey = customApiKey;
+  //   contentGeneratorConfig.apiBaseUrl = customApiBaseUrl;
+  //   // 不需要检查模型可用性，直接使用配置的模型
+  //   return contentGeneratorConfig;
+  // }
 
   return contentGeneratorConfig;
 }
@@ -118,10 +119,11 @@ export async function createContentGenerator(
   const version = process.env.CLI_VERSION || process.version;
   const httpOptions = {
     headers: {
-      'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
+      'User-Agent': `FoundationCLI/${version} (${process.platform}; ${process.arch})`,
     },
   };
-  if (config.authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
+  if (config.authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL || config.authType === AuthType.USE_CUSTOM_MODEL) {
+    console.log('=== createContentGenerator called ===');
     return createCodeAssistContentGenerator(httpOptions, config.authType);
   }
 
@@ -129,6 +131,7 @@ export async function createContentGenerator(
     config.authType === AuthType.USE_GEMINI ||
     config.authType === AuthType.USE_VERTEX_AI
   ) {
+    console.log('=== createContentGenerator called 2 ===');
     const googleGenAI = new GoogleGenAI({
       apiKey: config.apiKey === '' ? undefined : config.apiKey,
       vertexai: config.vertexai,
@@ -137,6 +140,15 @@ export async function createContentGenerator(
 
     return googleGenAI.models;
   }
+
+  // if (config.authType === AuthType.USE_CUSTOM_MODEL) {
+  //   const { CustomModelGenerator } = await import('/customModelGenerator.js');
+  //   return new CustomModelGenerator({
+  //     apiKey: config.apiKey!,
+  //     model: config.model,
+  //     apiBaseUrl: config.apiBaseUrl,
+  //   });
+  // }
 
   throw new Error(
     `Error creating contentGenerator: Unsupported authType: ${config.authType}`,

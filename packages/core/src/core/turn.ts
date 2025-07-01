@@ -143,6 +143,8 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiUsageMetadataEvent
   | ServerGeminiThoughtEvent;
 
+import fs from 'fs';
+
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
   readonly pendingToolCalls: ToolCallRequestInfo[];
@@ -153,6 +155,10 @@ export class Turn {
     this.pendingToolCalls = [];
     this.debugResponses = [];
   }
+  // constructor(private readonly chat: OpenAI.chat) {
+  //   this.pendingToolCalls = [];
+  //   this.debugResponses = [];
+  // }
   // The run method yields simpler events suitable for server logic
   async *run(
     req: PartListUnion,
@@ -166,6 +172,9 @@ export class Turn {
           abortSignal: signal,
         },
       });
+
+
+      fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] run once\n`);
 
       for await (const resp of responseStream) {
         if (signal?.aborted) {
@@ -197,6 +206,8 @@ export class Turn {
           continue;
         }
 
+        fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] Response ${JSON.stringify(resp)}\n`);
+
         const text = getResponseText(resp);
         if (text) {
           yield { type: GeminiEventType.Content, value: text };
@@ -205,7 +216,9 @@ export class Turn {
         // Handle function calls (requesting tool execution)
         const functionCalls = resp.functionCalls ?? [];
         for (const fnCall of functionCalls) {
+          fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] FunctionCalls ${JSON.stringify(fnCall)}\n`);
           const event = this.handlePendingFunctionCall(fnCall);
+          fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] handlePendingFunctionCall finish\n`);
           if (event) {
             yield event;
           }
@@ -215,7 +228,10 @@ export class Turn {
           this.lastUsageMetadata =
             resp.usageMetadata as GenerateContentResponseUsageMetadata;
         }
+        fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] finish one loop\n`);
       }
+      fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] finish responseStream\n`);
+
 
       if (this.lastUsageMetadata) {
         const durationMs = Date.now() - startTime;

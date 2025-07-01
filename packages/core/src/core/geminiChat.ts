@@ -35,6 +35,8 @@ import {
   ApiResponseEvent,
 } from '../telemetry/types.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import fs from 'fs';
+
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -197,6 +199,9 @@ export class GeminiChat {
    */
   private async handleFlashFallback(authType?: string): Promise<string | null> {
     // Only handle fallback for OAuth users
+    if (authType === AuthType.USE_CUSTOM_MODEL) {
+      return null;
+    }
     if (authType !== AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
       return null;
     }
@@ -365,16 +370,18 @@ export class GeminiChat {
       const streamResponse = await retryWithBackoff(apiCall, {
         shouldRetry: (error: Error) => {
           // Check error messages for status codes, or specific error names if known
-          if (error && error.message) {
-            if (error.message.includes('429')) return true;
-            if (error.message.match(/5\d{2}/)) return true;
-          }
+          // if (error && error.message) {
+          //   if (error.message.includes('429')) return true;
+          //   if (error.message.match(/5\d{2}/)) return true;
+          // }
           return false; // Don't retry other errors by default
         },
         onPersistent429: async (authType?: string) =>
           await this.handleFlashFallback(authType),
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
+
+      // const streamResponse = await apiCall();
 
       // Resolve the internal tracking of send completion promise - `sendPromise`
       // for both success and failure response. The actual failure is still

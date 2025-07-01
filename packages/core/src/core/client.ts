@@ -40,6 +40,10 @@ import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
 
+
+import fs from 'fs';
+
+
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
   return false;
@@ -57,6 +61,7 @@ export class GeminiClient {
   private readonly MAX_TURNS = 100;
 
   constructor(private config: Config) {
+    fs.appendFileSync('debug.log', `[${new Date().toISOString()}] Config: ${config}\n`);
     if (config.getProxy()) {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }

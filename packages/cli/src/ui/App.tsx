@@ -432,10 +432,14 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
       if (trimmedValue.length > 0) {
+        addItem({
+          type: MessageType.INFO,
+          text: `[DEBUG] UserInput: ${trimmedValue}`
+        }, Date.now());
         submitQuery(trimmedValue);
       }
     },
-    [submitQuery],
+    [submitQuery, addItem],
   );
 
   const logger = useLogger();
