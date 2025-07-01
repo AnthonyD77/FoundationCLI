@@ -75,7 +75,6 @@ function convertGeminiToolsToOpenAI(geminiTools: ToolListUnion | undefined): Ope
   return openAITools;
 }
 
-
 function convertGeminiRequestToOpenAI(req: CAGenerateContentRequest): ChatCompletionMessageParam[] {
   const messages: ChatCompletionMessageParam[] = [];
 
@@ -89,18 +88,35 @@ function convertGeminiRequestToOpenAI(req: CAGenerateContentRequest): ChatComple
     messages.push({ role: "system", content: systemText });
   }
 
-  // 2. 处理对话历史
+  // 2. 处理对话历史 - 需要收集所有的 tool responses
+  const allToolResponses = collectAllToolResponses(req.request.contents);
+
   req.request.contents.forEach((content) => {
     const { role, parts = [] } = content;
 
     if (role === "user") {
       processUserContent(parts, messages);
     } else if (role === "model") {
-      processModelContent(parts, messages);
+      processModelContent(parts, messages, allToolResponses);
     }
   });
 
   return messages;
+}
+
+// 收集所有的 tool responses
+function collectAllToolResponses(contents: any[]): Set<string> {
+  const responseIds = new Set<string>();
+
+  contents.forEach(content => {
+    if (content.role === "user" && content.parts) {
+      content.parts
+        .filter((p: { functionResponse: { id: any; }; }) => p.functionResponse?.id)
+        .forEach((p: { functionResponse: { id: string; }; }) => responseIds.add(p.functionResponse.id));
+    }
+  });
+
+  return responseIds;
 }
 
 // 处理用户消息
@@ -127,8 +143,12 @@ function processUserContent(parts: any[], messages: ChatCompletionMessageParam[]
     });
 }
 
-// 处理模型消息
-function processModelContent(parts: any[], messages: ChatCompletionMessageParam[]): void {
+// 处理模型消息 - 添加 allToolResponses 参数
+function processModelContent(
+  parts: any[],
+  messages: ChatCompletionMessageParam[],
+  allToolResponses: Set<string>
+): void {
   const textParts = parts.filter(p => p.text);
   const functionCalls = parts.filter(p => p.functionCall);
   const otherParts = parts.filter(p => !p.text && !p.functionCall && !p.functionResponse);
@@ -136,12 +156,23 @@ function processModelContent(parts: any[], messages: ChatCompletionMessageParam[
   const textContent = textParts.map(p => p.text).join('');
   const toolCalls = createToolCalls(functionCalls);
 
+  // 过滤掉没有对应响应的 tool calls
+  const validToolCalls = toolCalls.filter(tc => allToolResponses.has(tc.id));
+
+  // 如果有些 tool calls 没有响应，记录警告
+  if (toolCalls.length > validToolCalls.length) {
+    const missingIds = toolCalls
+      .filter(tc => !allToolResponses.has(tc.id))
+      .map(tc => tc.id);
+    console.warn('Tool calls without responses:', missingIds);
+  }
+
   // 处理文本和/或工具调用
-  if (textContent || toolCalls.length > 0) {
+  if (textContent || validToolCalls.length > 0) {
     messages.push({
       role: 'assistant',
       content: textContent || null,
-      ...(toolCalls.length > 0 && { tool_calls: toolCalls })
+      ...(validToolCalls.length > 0 && { tool_calls: validToolCalls })
     });
   }
 
@@ -163,6 +194,7 @@ function createToolCalls(functionCalls: any[]): any[] {
     }));
 }
 
+// 处理其他类型的 parts
 function processOtherParts(otherParts: any[], messages: ChatCompletionMessageParam[]): void {
   otherParts.forEach(part => {
     let content: string | null = null;
@@ -180,6 +212,113 @@ function processOtherParts(otherParts: any[], messages: ChatCompletionMessagePar
     }
   });
 }
+
+
+
+// function convertGeminiRequestToOpenAI(req: CAGenerateContentRequest): ChatCompletionMessageParam[] {
+//   const messages: ChatCompletionMessageParam[] = [];
+//
+//   // 1. 处理系统指令
+//   const systemText = req.request.systemInstruction?.parts
+//     ?.filter(p => p.text)
+//     .map(p => p.text)
+//     .join('');
+//
+//   if (systemText) {
+//     messages.push({ role: "system", content: systemText });
+//   }
+//
+//   // 2. 处理对话历史
+//   req.request.contents.forEach((content) => {
+//     const { role, parts = [] } = content;
+//
+//     if (role === "user") {
+//       processUserContent(parts, messages);
+//     } else if (role === "model") {
+//       processModelContent(parts, messages);
+//     }
+//   });
+//
+//   return messages;
+// }
+//
+// // 处理用户消息
+// function processUserContent(parts: any[], messages: ChatCompletionMessageParam[]): void {
+//   // 处理文本消息
+//   const textContent = parts
+//     .filter(p => p.text)
+//     .map(p => p.text)
+//     .join('');
+//
+//   if (textContent) {
+//     messages.push({ role: "user", content: textContent });
+//   }
+//
+//   // 处理函数响应
+//   parts
+//     .filter(p => p.functionResponse?.id)
+//     .forEach(({ functionResponse }) => {
+//       messages.push({
+//         role: 'tool',
+//         content: JSON.stringify(functionResponse.response || {}),
+//         tool_call_id: functionResponse.id,
+//       });
+//     });
+// }
+//
+// // 处理模型消息
+// function processModelContent(parts: any[], messages: ChatCompletionMessageParam[]): void {
+//   const textParts = parts.filter(p => p.text);
+//   const functionCalls = parts.filter(p => p.functionCall);
+//   const otherParts = parts.filter(p => !p.text && !p.functionCall && !p.functionResponse);
+//
+//   const textContent = textParts.map(p => p.text).join('');
+//   const toolCalls = createToolCalls(functionCalls);
+//
+//   // 处理文本和/或工具调用
+//   if (textContent || toolCalls.length > 0) {
+//     messages.push({
+//       role: 'assistant',
+//       content: textContent || null,
+//       ...(toolCalls.length > 0 && { tool_calls: toolCalls })
+//     });
+//   }
+//
+//   // 处理其他类型的 parts
+//   processOtherParts(otherParts, messages);
+// }
+//
+// // 创建工具调用数组
+// function createToolCalls(functionCalls: any[]): any[] {
+//   return functionCalls
+//     .filter(fc => fc.functionCall?.name)
+//     .map((fc, index) => ({
+//       id: fc.functionCall.id || `call_${Date.now()}_${index}`,
+//       type: "function",
+//       function: {
+//         name: fc.functionCall.name,
+//         arguments: JSON.stringify(fc.functionCall.args || {})
+//       }
+//     }));
+// }
+//
+// function processOtherParts(otherParts: any[], messages: ChatCompletionMessageParam[]): void {
+//   otherParts.forEach(part => {
+//     let content: string | null = null;
+//
+//     if (part.thought) {
+//       content = `[Thought: ${part.thoughtSignature || 'Processing...'}]`;
+//     } else if (part.codeExecutionResult) {
+//       content = `[Code Execution Result: ${JSON.stringify(part.codeExecutionResult)}]`;
+//     } else if (part.executableCode) {
+//       content = `[Executable Code: ${JSON.stringify(part.executableCode)}]`;
+//     }
+//
+//     if (content) {
+//       messages.push({ role: "assistant", content });
+//     }
+//   });
+// }
 
 
 async function* convertToGeminiStream(

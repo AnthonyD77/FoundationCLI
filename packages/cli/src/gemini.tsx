@@ -205,7 +205,7 @@ export async function main() {
     // 调用 DashScope
     const response = await testDashScope();
     if (response) {
-      console.log(`INTRO: ${response})`);
+      console.log(`INTRO: ${response}`);
     }
     render(
       <React.StrictMode>
