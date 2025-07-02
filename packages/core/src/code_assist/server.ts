@@ -20,7 +20,7 @@ import {
   EmbedContentParameters, ToolListUnion,
 } from '@google/genai';
 import * as readline from 'readline';
-import { ContentGenerator } from '../core/contentGenerator.js';
+import { ContentGenerator, ContentGeneratorConfig } from '../core/contentGenerator.js';
 import {
   CaGenerateContentResponse,
   toGenerateContentRequest,
@@ -47,11 +47,6 @@ export const CODE_ASSIST_ENDPOINT =
 export const CODE_ASSIST_API_VERSION = 'v1internal';
 
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
-
-const openai = new OpenAI({
-  apiKey: process.env.DASHSCOPE_API_KEY,
-  baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-});
 
 function convertGeminiToolsToOpenAI(geminiTools: ToolListUnion | undefined): OpenAI.Chat.Completions.ChatCompletionTool[] {
   const openAITools: OpenAI.Chat.Completions.ChatCompletionTool[] = [];
@@ -477,9 +472,8 @@ function convertToGeminiResponse(completion: any): GenerateContentResponse {
 
   response.createTime = new Date().toISOString();
   response.responseId = completion.id || `response-${Date.now()}`;
-  response.modelVersion = completion.model || 'qwen-plus-latest';
+  response.modelVersion = completion.model;
 
-  // 处理文本响应
   if (choice.message?.content) {
     response.candidates = [{
       content: {
@@ -492,7 +486,6 @@ function convertToGeminiResponse(completion: any): GenerateContentResponse {
     }];
   }
 
-  // 处理工具调用
   if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
     const parts: any[] = [];
 
@@ -525,7 +518,6 @@ function convertToGeminiResponse(completion: any): GenerateContentResponse {
     }];
   }
 
-  // 添加 usage metadata
   if (completion.usage) {
     response.usageMetadata = {
       promptTokenCount: completion.usage.prompt_tokens,
@@ -534,7 +526,6 @@ function convertToGeminiResponse(completion: any): GenerateContentResponse {
     };
   }
 
-  // 如果既没有文本也没有工具调用，创建空响应
   if (!choice.message?.content && !choice.message?.tool_calls) {
     response.candidates = [{
       content: {
@@ -552,9 +543,11 @@ function convertToGeminiResponse(completion: any): GenerateContentResponse {
 
 
 
+
 export class CodeAssistServer implements ContentGenerator {
+
   constructor(
-    readonly auth: AuthClient,
+    readonly auth?: AuthClient,
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
   ) {}
@@ -578,7 +571,12 @@ export class CodeAssistServer implements ContentGenerator {
   async generateContentStream(
     req: GenerateContentParameters,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    fs.appendFileSync('debug.log', `[${new Date().toISOString()}] Server.ts ${JSON.stringify(toGenerateContentRequest(req, this.projectId))}\n`);
+
+    const openai = new OpenAI({
+      apiKey: process.env.CUSTOM_API_KEY || "",
+      baseURL: process.env.CUSTOM_BASE_URL || ""
+    });
+
     const openApiReq = toGenerateContentRequest(req, this.projectId);
     const messages: Array<ChatCompletionMessageParam> = [];
 
@@ -593,10 +591,11 @@ export class CodeAssistServer implements ContentGenerator {
       }
     })
 
+    const tools = convertGeminiToolsToOpenAI(openApiReq.request.tools)
     const requestParams: any = {
       model: "qwen-plus-latest",
       messages: convertGeminiRequestToOpenAI(openApiReq),
-      tools : convertGeminiToolsToOpenAI(openApiReq.request.tools),
+      ...(tools && tools.length > 0 && { tools }),
       temperature : openApiReq.request.generationConfig?.temperature,
       top_p : openApiReq.request.generationConfig?.topP,
       stream : true,
@@ -624,7 +623,12 @@ export class CodeAssistServer implements ContentGenerator {
   async generateContent(
     req: GenerateContentParameters,
   ): Promise<GenerateContentResponse> {
-    fs.appendFileSync('debug.log', `[${new Date().toISOString()}] generateContent called ${JSON.stringify(toGenerateContentRequest(req, this.projectId))}\n`);
+
+    const openai = new OpenAI({
+      apiKey: process.env.CUSTOM_API_KEY || "",
+      baseURL: process.env.CUSTOM_BASE_URL || ""
+    });
+
     const openApiReq = toGenerateContentRequest(req, this.projectId);
     const messages: Array<ChatCompletionMessageParam> = [];
 
@@ -645,13 +649,14 @@ export class CodeAssistServer implements ContentGenerator {
       }
     });
 
+    const tools = convertGeminiToolsToOpenAI(openApiReq.request.tools)
     const requestParams: any = {
-      model: "qwen-plus-latest",
+      model: process.env.CUSTOM_MODEL_NAME,
       messages: convertGeminiRequestToOpenAI(openApiReq),
-      tools: convertGeminiToolsToOpenAI(openApiReq.request.tools),
+      ...(tools && tools.length > 0 && { tools }),
       temperature: openApiReq.request.generationConfig?.temperature,
       top_p: openApiReq.request.generationConfig?.topP,
-      stream: false,  // 👈 非流式调用
+      stream: false,
     };
 
     fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] [generateContent] RequestParams ${JSON.stringify(requestParams)}\n`);
@@ -707,7 +712,7 @@ export class CodeAssistServer implements ContentGenerator {
     req: object,
     signal?: AbortSignal,
   ): Promise<T> {
-    const res = await this.auth.request({
+    const res = await this.auth?.request({
       url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:${method}`,
       method: 'POST',
       headers: {
@@ -718,7 +723,7 @@ export class CodeAssistServer implements ContentGenerator {
       body: JSON.stringify(req),
       signal,
     });
-    return res.data as T;
+    return res?.data as T;
   }
 
   async streamEndpoint<T>(
@@ -726,7 +731,7 @@ export class CodeAssistServer implements ContentGenerator {
     req: object,
     signal?: AbortSignal,
   ): Promise<AsyncGenerator<T>> {
-    const res = await this.auth.request({
+    const res = await this.auth?.request({
       url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:${method}`,
       method: 'POST',
       params: {
@@ -743,7 +748,7 @@ export class CodeAssistServer implements ContentGenerator {
 
     return (async function* (): AsyncGenerator<T> {
       const rl = readline.createInterface({
-        input: res.data as PassThrough,
+        input: res?.data as PassThrough,
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
 

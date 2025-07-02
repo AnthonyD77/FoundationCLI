@@ -61,7 +61,6 @@ export class GeminiClient {
   private readonly MAX_TURNS = 100;
 
   constructor(private config: Config) {
-    fs.appendFileSync('debug.log', `[${new Date().toISOString()}] Config: ${config}\n`);
     if (config.getProxy()) {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }
@@ -440,36 +439,36 @@ export class GeminiClient {
       return null;
     }
 
-    const { totalTokens: originalTokenCount } =
-      await this.getContentGenerator().countTokens({
-        model: this.model,
-        contents: history,
-      });
+    // const { totalTokens: originalTokenCount } =
+    //   await this.getContentGenerator().countTokens({
+    //     model: this.model,
+    //     contents: history,
+    //   });
 
     // If not forced, check if we should compress based on context size.
-    if (!force) {
-      if (originalTokenCount === undefined) {
-        // If token count is undefined, we can't determine if we need to compress.
-        console.warn(
-          `Could not determine token count for model ${this.model}. Skipping compression check.`,
-        );
-        return null;
-      }
-      const tokenCount = originalTokenCount; // Now guaranteed to be a number
-
-      const limit = tokenLimit(this.model);
-      if (!limit) {
-        // If no limit is defined for the model, we can't compress.
-        console.warn(
-          `No token limit defined for model ${this.model}. Skipping compression check.`,
-        );
-        return null;
-      }
-
-      if (tokenCount < 0.95 * limit) {
-        return null;
-      }
-    }
+    // if (!force) {
+    //   if (originalTokenCount === undefined) {
+    //     // If token count is undefined, we can't determine if we need to compress.
+    //     console.warn(
+    //       `Could not determine token count for model ${this.model}. Skipping compression check.`,
+    //     );
+    //     return null;
+    //   }
+    //   const tokenCount = originalTokenCount; // Now guaranteed to be a number
+    //
+    //   const limit = tokenLimit(this.model);
+    //   if (!limit) {
+    //     // If no limit is defined for the model, we can't compress.
+    //     console.warn(
+    //       `No token limit defined for model ${this.model}. Skipping compression check.`,
+    //     );
+    //     return null;
+    //   }
+    //
+    //   if (tokenCount < 0.95 * limit) {
+    //     return null;
+    //   }
+    // }
 
     const summarizationRequestMessage = {
       text: 'Summarize our conversation up to this point. The summary should be a concise yet comprehensive overview of all key topics, questions, answers, and important details discussed. This summary will replace the current chat history to conserve tokens, so it must capture everything essential to understand the context and continue our conversation effectively as if no information was lost.',
@@ -488,19 +487,14 @@ export class GeminiClient {
       },
     ];
     this.chat = await this.startChat(newHistory);
-    const newTokenCount = (
-      await this.getContentGenerator().countTokens({
-        model: this.model,
-        contents: newHistory,
-      })
-    ).totalTokens;
+    // const newTokenCount = (
+    //   await this.getContentGenerator().countTokens({
+    //     model: this.model,
+    //     contents: newHistory,
+    //   })
+    // ).totalTokens;
 
-    return originalTokenCount && newTokenCount
-      ? {
-          originalTokenCount,
-          newTokenCount,
-        }
-      : null;
+    return null;
   }
 
   /**

@@ -67,8 +67,6 @@ export async function retryWithBackoff<T>(
   options?: Partial<RetryOptions>,
 ): Promise<T> {
 
-  fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] retry retry\n`);
-
   const {
     maxAttempts,
     initialDelayMs,

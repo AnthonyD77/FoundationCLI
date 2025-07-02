@@ -54,10 +54,10 @@ export async function createContentGeneratorConfig(
   authType: AuthType | undefined,
   config?: { getModel?: () => string },
 ): Promise<ContentGeneratorConfig> {
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  const googleApiKey = process.env.GOOGLE_API_KEY;
-  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
-  const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION;
+  const geminiApiKey = process.env.GEMINI_API_KEY || "";
+  const googleApiKey = process.env.GOOGLE_API_KEY || "";
+  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT || "";
+  const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION || "";
 
   // Use runtime model from config if available, otherwise fallback to parameter or default
   const effectiveModel = config?.getModel?.() || model || DEFAULT_GEMINI_MODEL;
@@ -123,7 +123,6 @@ export async function createContentGenerator(
     },
   };
   if (config.authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL || config.authType === AuthType.USE_CUSTOM_MODEL) {
-    console.log('=== createContentGenerator called ===');
     return createCodeAssistContentGenerator(httpOptions, config.authType);
   }
 
@@ -131,7 +130,6 @@ export async function createContentGenerator(
     config.authType === AuthType.USE_GEMINI ||
     config.authType === AuthType.USE_VERTEX_AI
   ) {
-    console.log('=== createContentGenerator called 2 ===');
     const googleGenAI = new GoogleGenAI({
       apiKey: config.apiKey === '' ? undefined : config.apiKey,
       vertexai: config.vertexai,

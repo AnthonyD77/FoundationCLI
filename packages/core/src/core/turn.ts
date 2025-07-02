@@ -174,8 +174,6 @@ export class Turn {
       });
 
 
-      fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] run once\n`);
-
       for await (const resp of responseStream) {
         if (signal?.aborted) {
           yield { type: GeminiEventType.UserCancelled };
@@ -228,9 +226,7 @@ export class Turn {
           this.lastUsageMetadata =
             resp.usageMetadata as GenerateContentResponseUsageMetadata;
         }
-        fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] finish one loop\n`);
       }
-      fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] finish responseStream\n`);
 
 
       if (this.lastUsageMetadata) {

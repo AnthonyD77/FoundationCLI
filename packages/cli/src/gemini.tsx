@@ -12,11 +12,11 @@ import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
 import v8 from 'node:v8';
 import os from 'node:os';
-import { spawn } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
 import {
   LoadedSettings,
-  loadSettings,
+  loadSettings, SETTINGS_DIRECTORY_NAME,
   SettingScope,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
@@ -115,12 +115,33 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   process.exit(0);
 }
 
+interface CustomConfig {
+  model: string;
+  baseUrl: string;
+  apiKey: string;
+}
+
+import fs from "fs";
+import path from 'path';
+
 export async function main() {
-  // console.log(`===== process.cwd() ${process.cwd()} =====`);
-  // console.log(`===== SANDBOX ${process.env.SANDBOX} =====`);
 
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
+
+
+  const customModelConfigPath = path.join(
+    workspaceRoot,
+    'custom-model-config.json',
+  );
+  const configContent = await fs.promises.readFile(customModelConfigPath, 'utf-8');
+  const customConfig = await JSON.parse(configContent) as CustomConfig;
+
+  process.env.CUSTOM_API_KEY = customConfig.apiKey;
+  process.env.CUSTOM_BASE_URL = customConfig.baseUrl;
+  process.env.CUSTOM_MODEL_NAME = customConfig.model;
+
+  console.log(`Current model is ${customConfig.model}`)
 
   await cleanupCheckpoints();
   if (settings.errors.length > 0) {
@@ -172,6 +193,7 @@ export async function main() {
     ? getNodeMemoryArgs(config)
     : [];
 
+  // not sandbox !!!
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env.SANDBOX) {
     const sandboxConfig = config.getSandbox();
@@ -202,11 +224,10 @@ export async function main() {
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (process.stdin.isTTY && input?.length === 0) {
     setWindowTitle(basename(workspaceRoot), settings);
-    // 调用 DashScope
-    const response = await testDashScope();
-    if (response) {
-      console.log(`INTRO: ${response}`);
-    }
+    // const response = await testDashScope();
+    // if (response) {
+    //   console.log(`INTRO: ${response}`);
+    // }
     render(
       <React.StrictMode>
         <AppWrapper

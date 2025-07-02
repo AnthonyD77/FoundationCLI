@@ -89,9 +89,10 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
 
-  useEffect(() => {
-    checkForUpdates().then(setUpdateMessage);
-  }, []);
+  // -- turn off update check
+  // useEffect(() => {
+  //   checkForUpdates().then(setUpdateMessage);
+  // }, []);
 
   const { history, addItem, clearItems, loadHistory } = useHistory();
   const {
