@@ -227,10 +227,10 @@ export class GeminiClient {
       return new Turn(this.getChat());
     }
 
-    const compressed = await this.tryCompressChat();
-    if (compressed) {
-      yield { type: GeminiEventType.ChatCompressed, value: compressed };
-    }
+    // const compressed = await this.tryCompressChat();
+    // if (compressed) {
+    //   yield { type: GeminiEventType.ChatCompressed, value: compressed };
+    // }
     const turn = new Turn(this.getChat());
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {

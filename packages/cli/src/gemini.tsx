@@ -195,29 +195,29 @@ export async function main() {
 
   // not sandbox !!!
   // hop into sandbox if we are outside and sandboxing is enabled
-  if (!process.env.SANDBOX) {
-    const sandboxConfig = config.getSandbox();
-    if (sandboxConfig) {
-      if (settings.merged.selectedAuthType) {
-        // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
-        const err = validateAuthMethod(settings.merged.selectedAuthType);
-        if (err) {
-          console.error(err);
-          process.exit(1);
-        }
-        await config.refreshAuth(settings.merged.selectedAuthType);
-      }
-      await start_sandbox(sandboxConfig, memoryArgs);
-      process.exit(0);
-    } else {
-      // Not in a sandbox and not entering one, so relaunch with additional
-      // arguments to control memory usage if needed.
-      if (memoryArgs.length > 0) {
-        await relaunchWithAdditionalArgs(memoryArgs);
-        process.exit(0);
-      }
-    }
-  }
+  // if (!process.env.SANDBOX) {
+  //   const sandboxConfig = config.getSandbox();
+  //   if (sandboxConfig) {
+  //     if (settings.merged.selectedAuthType) {
+  //       // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
+  //       const err = validateAuthMethod(settings.merged.selectedAuthType);
+  //       if (err) {
+  //         console.error(err);
+  //         process.exit(1);
+  //       }
+  //       await config.refreshAuth(settings.merged.selectedAuthType);
+  //     }
+  //     await start_sandbox(sandboxConfig, memoryArgs);
+  //     process.exit(0);
+  //   } else {
+  //     // Not in a sandbox and not entering one, so relaunch with additional
+  //     // arguments to control memory usage if needed.
+  //     if (memoryArgs.length > 0) {
+  //       await relaunchWithAdditionalArgs(memoryArgs);
+  //       process.exit(0);
+  //     }
+  //   }
+  // }
   let input = config.getQuestion();
   const startupWarnings = await getStartupWarnings();
 
