@@ -435,7 +435,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
       if (trimmedValue.length > 0) {
         addItem({
           type: MessageType.INFO,
-          text: `[DEBUG] UserInput: ${trimmedValue}`
+          // text: `[DEBUG] UserInput: ${trimmedValue}`
         }, Date.now());
         submitQuery(trimmedValue);
       }
