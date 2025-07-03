@@ -9,7 +9,7 @@ import { loadEnvironment } from './config.js';
 
 export const validateAuthMethod = (authMethod: string): string | null => {
   loadEnvironment();
-  if (authMethod === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
+  if (authMethod === AuthType.LOGIN_WITH_GOOGLE_PERSONAL || authMethod === AuthType.USE_CUSTOM_MODEL) {
     return null;
   }
 

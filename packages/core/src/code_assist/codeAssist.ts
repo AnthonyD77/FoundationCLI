@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType, ContentGenerator } from '../core/contentGenerator.js';
+import { AuthType, ContentGenerator, ContentGeneratorConfig } from '../core/contentGenerator.js';
 import { getOauthClient } from './oauth2.js';
 import { setupUser } from './setup.js';
 import { CodeAssistServer, HttpOptions } from './server.js';
@@ -17,6 +17,12 @@ export async function createCodeAssistContentGenerator(
     const authClient = await getOauthClient();
     const projectId = await setupUser(authClient);
     return new CodeAssistServer(authClient, projectId, httpOptions);
+  }
+
+  if (authType === AuthType.USE_CUSTOM_MODEL) {
+    // const authClient = await getOauthClient();
+    const randomUUID = crypto.randomUUID();
+    return new CodeAssistServer(undefined,`LocalCustomModelUser-${randomUUID}`, httpOptions);
   }
 
   throw new Error(`Unsupported authType: ${authType}`);

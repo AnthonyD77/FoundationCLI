@@ -89,9 +89,10 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
 
-  useEffect(() => {
-    checkForUpdates().then(setUpdateMessage);
-  }, []);
+  // -- turn off update check
+  // useEffect(() => {
+  //   checkForUpdates().then(setUpdateMessage);
+  // }, []);
 
   const { history, addItem, clearItems, loadHistory } = useHistory();
   const {
@@ -432,10 +433,14 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
       if (trimmedValue.length > 0) {
+        addItem({
+          type: MessageType.INFO,
+          // text: `[DEBUG] UserInput: ${trimmedValue}`
+        }, Date.now());
         submitQuery(trimmedValue);
       }
     },
-    [submitQuery],
+    [submitQuery, addItem],
   );
 
   const logger = useLogger();
