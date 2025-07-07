@@ -359,8 +359,8 @@ async function* convertToGeminiStream(
         safetyRatings: []
       }];
       response.createTime = new Date().toISOString();
-      response.responseId = chunk.id || `response-${Date.now()}`;
-      response.modelVersion = chunk.model || 'qwen-plus-latest';
+      response.responseId = chunk.id || ``;
+      response.modelVersion = chunk.model || '';
 
       yield response;
     }
@@ -580,6 +580,8 @@ export class CodeAssistServer implements ContentGenerator {
     const openApiReq = toGenerateContentRequest(req, this.projectId);
     const messages: Array<ChatCompletionMessageParam> = [];
 
+    openApiReq.model = process.env.CUSTOM_MODEL_NAME || ""
+
     fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] Raw RequestParams ${JSON.stringify(openApiReq)}\n`);
 
     openApiReq.request.contents.forEach((content) => {
@@ -593,7 +595,7 @@ export class CodeAssistServer implements ContentGenerator {
 
     const tools = convertGeminiToolsToOpenAI(openApiReq.request.tools)
     const requestParams: any = {
-      model: "qwen-plus-latest",
+      model: process.env.CUSTOM_MODEL_NAME,
       messages: convertGeminiRequestToOpenAI(openApiReq),
       ...(tools && tools.length > 0 && { tools }),
       temperature : openApiReq.request.generationConfig?.temperature,
