@@ -19,12 +19,12 @@ interface FooterProps {
   debugMode: boolean;
   debugMessage: string;
   corgiMode: boolean;
-  errorCount: number;
+  errorCount: number | undefined;
   showErrorDetails: boolean;
   showMemoryUsage?: boolean;
   promptTokenCount: number;
   candidatesTokenCount: number;
-  totalTokenCount: number;
+  totalTokenCount: number | undefined;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -40,7 +40,7 @@ export const Footer: React.FC<FooterProps> = ({
   totalTokenCount,
 }) => {
   const limit = tokenLimit(model);
-  const percentage = totalTokenCount / limit;
+  // const percentage = totalTokenCount / limit;
 
   return (
     <Box marginTop={1} justifyContent="space-between" width="100%">
@@ -57,36 +57,36 @@ export const Footer: React.FC<FooterProps> = ({
       </Box>
 
       {/* Middle Section: Centered Sandbox Info */}
+      {/*<Box*/}
+      {/*  flexGrow={1}*/}
+      {/*  alignItems="center"*/}
+      {/*  justifyContent="center"*/}
+      {/*  display="flex"*/}
+      {/*>*/}
+      {/*  {process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec' ? (*/}
+      {/*    <Text color="green">*/}
+      {/*      {process.env.SANDBOX.replace(/^gemini-(?:cli-)?/, '')}*/}
+      {/*    </Text>*/}
+      {/*  ) : process.env.SANDBOX === 'sandbox-exec' ? (*/}
+      {/*    <Text color={Colors.AccentYellow}>*/}
+      {/*      MacOS Seatbelt{' '}*/}
+      {/*      <Text color={Colors.Gray}>({process.env.SEATBELT_PROFILE})</Text>*/}
+      {/*    </Text>*/}
+      {/*  ) : (*/}
+      {/*    <Text color={Colors.AccentRed}>*/}
+      {/*      no sandbox <Text color={Colors.Gray}>(see /docs)</Text>*/}
+      {/*    </Text>*/}
+      {/*  )}*/}
+      {/*</Box>*/}
+
+      {/* Right Section: Gemini Label and Console Summary */}
       <Box
         flexGrow={1}
         alignItems="center"
         justifyContent="center"
-        display="flex"
       >
-        {process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec' ? (
-          <Text color="green">
-            {process.env.SANDBOX.replace(/^gemini-(?:cli-)?/, '')}
-          </Text>
-        ) : process.env.SANDBOX === 'sandbox-exec' ? (
-          <Text color={Colors.AccentYellow}>
-            MacOS Seatbelt{' '}
-            <Text color={Colors.Gray}>({process.env.SEATBELT_PROFILE})</Text>
-          </Text>
-        ) : (
-          <Text color={Colors.AccentRed}>
-            no sandbox <Text color={Colors.Gray}>(see /docs)</Text>
-          </Text>
-        )}
-      </Box>
-
-      {/* Right Section: Gemini Label and Console Summary */}
-      <Box alignItems="center">
         <Text color={Colors.AccentBlue}>
-          {' '}
-          {model}{' '}
-          <Text color={Colors.Gray}>
-            ({((1 - percentage) * 100).toFixed(0)}% context left)
-          </Text>
+          {'model:'}{model}{' '}
         </Text>
         {corgiMode && (
           <Text>
@@ -98,13 +98,13 @@ export const Footer: React.FC<FooterProps> = ({
             <Text color={Colors.AccentRed}>▼ </Text>
           </Text>
         )}
-        {!showErrorDetails && errorCount > 0 && (
-          <Box>
-            <Text color={Colors.Gray}>| </Text>
-            <ConsoleSummaryDisplay errorCount={errorCount} />
-          </Box>
-        )}
-        {showMemoryUsage && <MemoryUsageDisplay />}
+        {/*{!showErrorDetails && errorCount > 0 && (*/}
+        {/*  <Box>*/}
+        {/*    <Text color={Colors.Gray}>| </Text>*/}
+        {/*    <ConsoleSummaryDisplay errorCount={errorCount} />*/}
+        {/*  </Box>*/}
+        {/*)}*/}
+        {/*{showMemoryUsage && <MemoryUsageDisplay />}*/}
       </Box>
     </Box>
   );

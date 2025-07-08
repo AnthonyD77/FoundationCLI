@@ -204,7 +204,7 @@ export class Turn {
           continue;
         }
 
-        fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] Response ${JSON.stringify(resp)}\n`);
+        fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] Response ${JSON.stringify(resp)}\n`);
 
         const text = getResponseText(resp);
         if (text) {
@@ -214,9 +214,9 @@ export class Turn {
         // Handle function calls (requesting tool execution)
         const functionCalls = resp.functionCalls ?? [];
         for (const fnCall of functionCalls) {
-          fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] FunctionCalls ${JSON.stringify(fnCall)}\n`);
+          fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] FunctionCalls ${JSON.stringify(fnCall)}\n`);
           const event = this.handlePendingFunctionCall(fnCall);
-          fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] handlePendingFunctionCall finish\n`);
+          fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] handlePendingFunctionCall finish\n`);
           if (event) {
             yield event;
           }

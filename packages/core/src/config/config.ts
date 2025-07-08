@@ -252,7 +252,7 @@ export class Config {
     this.toolRegistry = await createToolRegistry(this);
     // const registeredTools = this.toolRegistry.getAllTools?.() || [];
     // const toolNames = registeredTools.map(tool => tool.name || tool.constructor.name);
-    // fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] Registered tools: ${JSON.stringify(toolNames)}\n`);
+    // fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] Registered tools: ${JSON.stringify(toolNames)}\n`);
     await gc.initialize(contentConfig);
     this.contentGeneratorConfig = contentConfig;
 

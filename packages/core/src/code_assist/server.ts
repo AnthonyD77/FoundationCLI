@@ -582,7 +582,7 @@ export class CodeAssistServer implements ContentGenerator {
 
     openApiReq.model = process.env.CUSTOM_MODEL_NAME || ""
 
-    fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] Raw RequestParams ${JSON.stringify(openApiReq)}\n`);
+    fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] Raw RequestParams ${JSON.stringify(openApiReq)}\n`);
 
     openApiReq.request.contents.forEach((content) => {
       if (content.role === "user") {
@@ -603,7 +603,7 @@ export class CodeAssistServer implements ContentGenerator {
       stream : true,
     };
 
-    fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] RequestParams ${JSON.stringify(requestParams)}\n`);
+    fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] RequestParams ${JSON.stringify(requestParams)}\n`);
 
     const completion = await openai.chat.completions.create(requestParams);
     // @ts-ignore
@@ -634,7 +634,7 @@ export class CodeAssistServer implements ContentGenerator {
     const openApiReq = toGenerateContentRequest(req, this.projectId);
     const messages: Array<ChatCompletionMessageParam> = [];
 
-    fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] [generateContent] Raw RequestParams ${JSON.stringify(openApiReq)}\n`);
+    fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] [generateContent] Raw RequestParams ${JSON.stringify(openApiReq)}\n`);
 
     // 转换消息历史
     openApiReq.request.contents.forEach((content) => {
@@ -661,17 +661,17 @@ export class CodeAssistServer implements ContentGenerator {
       stream: false,
     };
 
-    fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] [generateContent] RequestParams ${JSON.stringify(requestParams)}\n`);
+    fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] [generateContent] RequestParams ${JSON.stringify(requestParams)}\n`);
 
     try {
       const completion = await openai.chat.completions.create(requestParams);
 
-      fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] [generateContent] OpenAI Response ${JSON.stringify(completion)}\n`);
+      fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] [generateContent] OpenAI Response ${JSON.stringify(completion)}\n`);
 
       // 转换非流式响应到 Gemini 格式
       return convertToGeminiResponse(completion);
     } catch (error) {
-      fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] [generateContent] Error: ${error}\n`);
+      fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] [generateContent] Error: ${error}\n`);
       throw error;
     }
   }
