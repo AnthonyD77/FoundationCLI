@@ -750,7 +750,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                     </Text>
                   ) : (
                     <ContextSummaryDisplay
-                      geminiMdFileCount={geminiMdFileCount}
+                      geminiMdFileCount={0}
                       contextFileNames={contextFileNames}
                       mcpServers={config.getMcpServers()}
                       showToolDescriptions={showToolDescriptions}
@@ -831,7 +831,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             </Box>
           )}
           <Footer
-            model={currentModel}
+            model={process.env.CUSTOM_MODEL_NAME || ""}
             targetDir={config.getTargetDir()}
             debugMode={config.getDebugMode()}
             branchName={branchName}

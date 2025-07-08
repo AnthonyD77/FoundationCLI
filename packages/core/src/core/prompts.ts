@@ -255,6 +255,9 @@ To help you check their settings, I can read their contents. Which one would you
 Your core function is efficient and safe assistance. Balance extreme conciseness with the crucial need for clarity, especially regarding safety and potential system modifications. Always prioritize user control and project conventions. Never make assumptions about the contents of files; instead use '${ReadFileTool.Name}' or '${ReadManyFilesTool.Name}' to ensure you aren't making broad assumptions. Finally, you are an agent - please keep going until the user's query is completely resolved.
 `.trim();
 
+  fs.appendFileSync('debug.log', `[${new Date().toISOString()}] process.env.SANDBOX = ${process.env.SANDBOX}\n`);
+  fs.appendFileSync('debug.log', `[${new Date().toISOString()}] prompt = ${JSON.stringify(basePrompt)}\n`);
+
   // if GEMINI_WRITE_SYSTEM_MD is set (and not 0|false), write base system prompt to file
   const writeSystemMdVar = process.env.GEMINI_WRITE_SYSTEM_MD?.toLowerCase();
   if (writeSystemMdVar && !['0', 'false'].includes(writeSystemMdVar)) {

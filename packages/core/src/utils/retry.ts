@@ -90,7 +90,7 @@ export async function retryWithBackoff<T>(
     } catch (error) {
       const errorStatus = getErrorStatus(error);
 
-      fs.appendFileSync('debug-qwen.log', `[${new Date().toISOString()}] Retry error ${JSON.stringify(error)}\n`);
+      fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] Retry error ${JSON.stringify(error)}\n`);
 
       // Track consecutive 429 errors
       if (errorStatus === 429) {
