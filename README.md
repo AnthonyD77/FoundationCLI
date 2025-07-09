@@ -25,9 +25,9 @@ This project is a fork of [Gemini CLI](https://github.com/google-gemini/gemini-c
 Edit the `custom-model-config.json` in the project root
 ```json
 {
-  "apiEndpoint": "https://your-custom-endpoint.com/v1",
+  "baseUrl": "https://your-api-endpoint.com/v1",
   "apiKey": "your-api-key",
-  "modelCode": "your-model-name"
+  "model": "your-model-name"
 }
 ```
 3. **Build and run:**
