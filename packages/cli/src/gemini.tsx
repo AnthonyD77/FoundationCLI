@@ -141,7 +141,7 @@ export async function main() {
   process.env.CUSTOM_BASE_URL = customConfig.baseUrl;
   process.env.CUSTOM_MODEL_NAME = customConfig.model;
 
-  console.log(`Current model is ${customConfig.model}`)
+  console.log(`Welcome to Foundation CLI!`)
 
   await cleanupCheckpoints();
   if (settings.errors.length > 0) {
