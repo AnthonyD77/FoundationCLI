@@ -35,6 +35,48 @@ import OpenAI from "openai";
 import fs from 'fs';
 import { FinishReason } from '@google/genai';
 
+// 环境变量缓存和配置读取
+let ENV_CACHE: {
+  CUSTOM_API_KEY: string;
+  CUSTOM_BASE_URL: string;
+  CUSTOM_MODEL_NAME: string;
+  DEBUG_ENABLED: boolean;
+} | null = null;
+
+function getEnvCache() {
+  if (!ENV_CACHE) {
+    // 尝试从配置文件读取
+    let configData: any = {};
+    try {
+      const configPath = './custom-model-config.json';
+      const fs = require('fs');
+      if (fs.existsSync(configPath)) {
+        configData = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      }
+    } catch (error) {
+      console.warn('Failed to read custom-model-config.json:', error);
+    }
+
+    ENV_CACHE = {
+      CUSTOM_API_KEY: process.env.CUSTOM_API_KEY || configData.apiKey || "",
+      CUSTOM_BASE_URL: process.env.CUSTOM_BASE_URL || configData.baseUrl || "",
+      CUSTOM_MODEL_NAME: process.env.CUSTOM_MODEL_NAME || configData.model || "",
+      DEBUG_ENABLED: process.env.DEBUG_ENABLED === 'true'
+    };
+  }
+  return ENV_CACHE;
+}
+
+// 异步调试日志函数
+function writeDebugLog(message: string): void {
+  const cache = getEnvCache();
+  if (cache.DEBUG_ENABLED) {
+    fs.appendFile('debug-llm-api.log', `[${new Date().toISOString()}] ${message}\n`, (err) => {
+      if (err) console.error('Debug log write error:', err);
+    });
+  }
+}
+
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
@@ -114,60 +156,67 @@ function collectAllToolResponses(contents: any[]): Set<string> {
   return responseIds;
 }
 
-// 处理用户消息
+// 处理用户消息 - 优化版本
 function processUserContent(parts: any[], messages: ChatCompletionMessageParam[]): void {
-  // 处理文本消息
-  const textContent = parts
-    .filter(p => p.text)
-    .map(p => p.text)
-    .join('');
+  let textContent = '';
+  const toolResponses: any[] = [];
+
+  // 单次遍历处理所有parts
+  for (const part of parts) {
+    if (part.text) {
+      textContent += part.text;
+    } else if (part.functionResponse?.id) {
+      toolResponses.push({
+        role: 'tool',
+        content: JSON.stringify(part.functionResponse.response || {}),
+        tool_call_id: part.functionResponse.id,
+      });
+    }
+  }
 
   if (textContent) {
     messages.push({ role: "user", content: textContent });
   }
-
-  // 处理函数响应
-  parts
-    .filter(p => p.functionResponse?.id)
-    .forEach(({ functionResponse }) => {
-      messages.push({
-        role: 'tool',
-        content: JSON.stringify(functionResponse.response || {}),
-        tool_call_id: functionResponse.id,
-      });
-    });
+  messages.push(...toolResponses);
 }
 
-// 处理模型消息 - 添加 allToolResponses 参数
+// 处理模型消息 - 优化版本
 function processModelContent(
   parts: any[],
   messages: ChatCompletionMessageParam[],
   allToolResponses: Set<string>
 ): void {
-  const textParts = parts.filter(p => p.text);
-  const functionCalls = parts.filter(p => p.functionCall);
-  const otherParts = parts.filter(p => !p.text && !p.functionCall && !p.functionResponse);
+  let textContent = '';
+  const toolCalls: any[] = [];
+  const otherParts: any[] = [];
 
-  const textContent = textParts.map(p => p.text).join('');
-  const toolCalls = createToolCalls(functionCalls);
-
-  // 过滤掉没有对应响应的 tool calls
-  const validToolCalls = toolCalls.filter(tc => allToolResponses.has(tc.id));
-
-  // 如果有些 tool calls 没有响应，记录警告
-  if (toolCalls.length > validToolCalls.length) {
-    const missingIds = toolCalls
-      .filter(tc => !allToolResponses.has(tc.id))
-      .map(tc => tc.id);
-    console.warn('Tool calls without responses:', missingIds);
+  // 单次遍历处理所有parts
+  for (const part of parts) {
+    if (part.text) {
+      textContent += part.text;
+    } else if (part.functionCall?.name) {
+      const toolCall = {
+        id: part.functionCall.id || `call_${Date.now()}_${toolCalls.length}`,
+        type: "function",
+        function: {
+          name: part.functionCall.name,
+          arguments: JSON.stringify(part.functionCall.args || {})
+        }
+      };
+      if (allToolResponses.has(toolCall.id)) {
+        toolCalls.push(toolCall);
+      }
+    } else if (!part.functionResponse) {
+      otherParts.push(part);
+    }
   }
 
   // 处理文本和/或工具调用
-  if (textContent || validToolCalls.length > 0) {
+  if (textContent || toolCalls.length > 0) {
     messages.push({
       role: 'assistant',
       content: textContent || null,
-      ...(validToolCalls.length > 0 && { tool_calls: validToolCalls })
+      ...(toolCalls.length > 0 && { tool_calls: toolCalls })
     });
   }
 
@@ -175,23 +224,10 @@ function processModelContent(
   processOtherParts(otherParts, messages);
 }
 
-// 创建工具调用数组
-function createToolCalls(functionCalls: any[]): any[] {
-  return functionCalls
-    .filter(fc => fc.functionCall?.name)
-    .map((fc, index) => ({
-      id: fc.functionCall.id || `call_${Date.now()}_${index}`,
-      type: "function",
-      function: {
-        name: fc.functionCall.name,
-        arguments: JSON.stringify(fc.functionCall.args || {})
-      }
-    }));
-}
 
-// 处理其他类型的 parts
+// 处理其他类型的 parts - 优化版本
 function processOtherParts(otherParts: any[], messages: ChatCompletionMessageParam[]): void {
-  otherParts.forEach(part => {
+  for (const part of otherParts) {
     let content: string | null = null;
 
     if (part.thought) {
@@ -205,122 +241,16 @@ function processOtherParts(otherParts: any[], messages: ChatCompletionMessagePar
     if (content) {
       messages.push({ role: "assistant", content });
     }
-  });
+  }
 }
 
 
 
-// function convertGeminiRequestToOpenAI(req: CAGenerateContentRequest): ChatCompletionMessageParam[] {
-//   const messages: ChatCompletionMessageParam[] = [];
-//
-//   // 1. 处理系统指令
-//   const systemText = req.request.systemInstruction?.parts
-//     ?.filter(p => p.text)
-//     .map(p => p.text)
-//     .join('');
-//
-//   if (systemText) {
-//     messages.push({ role: "system", content: systemText });
-//   }
-//
-//   // 2. 处理对话历史
-//   req.request.contents.forEach((content) => {
-//     const { role, parts = [] } = content;
-//
-//     if (role === "user") {
-//       processUserContent(parts, messages);
-//     } else if (role === "model") {
-//       processModelContent(parts, messages);
-//     }
-//   });
-//
-//   return messages;
-// }
-//
-// // 处理用户消息
-// function processUserContent(parts: any[], messages: ChatCompletionMessageParam[]): void {
-//   // 处理文本消息
-//   const textContent = parts
-//     .filter(p => p.text)
-//     .map(p => p.text)
-//     .join('');
-//
-//   if (textContent) {
-//     messages.push({ role: "user", content: textContent });
-//   }
-//
-//   // 处理函数响应
-//   parts
-//     .filter(p => p.functionResponse?.id)
-//     .forEach(({ functionResponse }) => {
-//       messages.push({
-//         role: 'tool',
-//         content: JSON.stringify(functionResponse.response || {}),
-//         tool_call_id: functionResponse.id,
-//       });
-//     });
-// }
-//
-// // 处理模型消息
-// function processModelContent(parts: any[], messages: ChatCompletionMessageParam[]): void {
-//   const textParts = parts.filter(p => p.text);
-//   const functionCalls = parts.filter(p => p.functionCall);
-//   const otherParts = parts.filter(p => !p.text && !p.functionCall && !p.functionResponse);
-//
-//   const textContent = textParts.map(p => p.text).join('');
-//   const toolCalls = createToolCalls(functionCalls);
-//
-//   // 处理文本和/或工具调用
-//   if (textContent || toolCalls.length > 0) {
-//     messages.push({
-//       role: 'assistant',
-//       content: textContent || null,
-//       ...(toolCalls.length > 0 && { tool_calls: toolCalls })
-//     });
-//   }
-//
-//   // 处理其他类型的 parts
-//   processOtherParts(otherParts, messages);
-// }
-//
-// // 创建工具调用数组
-// function createToolCalls(functionCalls: any[]): any[] {
-//   return functionCalls
-//     .filter(fc => fc.functionCall?.name)
-//     .map((fc, index) => ({
-//       id: fc.functionCall.id || `call_${Date.now()}_${index}`,
-//       type: "function",
-//       function: {
-//         name: fc.functionCall.name,
-//         arguments: JSON.stringify(fc.functionCall.args || {})
-//       }
-//     }));
-// }
-//
-// function processOtherParts(otherParts: any[], messages: ChatCompletionMessageParam[]): void {
-//   otherParts.forEach(part => {
-//     let content: string | null = null;
-//
-//     if (part.thought) {
-//       content = `[Thought: ${part.thoughtSignature || 'Processing...'}]`;
-//     } else if (part.codeExecutionResult) {
-//       content = `[Code Execution Result: ${JSON.stringify(part.codeExecutionResult)}]`;
-//     } else if (part.executableCode) {
-//       content = `[Executable Code: ${JSON.stringify(part.executableCode)}]`;
-//     }
-//
-//     if (content) {
-//       messages.push({ role: "assistant", content });
-//     }
-//   });
-// }
 
 
 async function* convertToGeminiStream(
   completion: AsyncIterable<any>
 ): AsyncGenerator<GenerateContentResponse> {
-  // 收集数据
-  let accumulatedText = '';
   const toolCallAccumulator: Map<number, {
     id: string;
     name: string;
@@ -341,28 +271,10 @@ async function* convertToGeminiStream(
       openAIFinishReason = choice.finish_reason;
     }
 
-    // 累积文本内容
+    // 直接流式输出文本内容，不再累积
     if (choice.delta?.content) {
-      accumulatedText += choice.delta.content;
       hasContent = true;
-
-      // 流式输出文本
-      const response = new GenerateContentResponse();
-      response.candidates = [{
-        content: {
-          parts: [{ text: choice.delta.content }],
-          role: 'model'
-        },
-        index: 0,
-        // 流式输出时不设置 finishReason，除非这是最后一个 chunk
-        finishReason: choice.finish_reason ? mapFinishReason(choice.finish_reason) : undefined,
-        safetyRatings: []
-      }];
-      response.createTime = new Date().toISOString();
-      response.responseId = chunk.id || ``;
-      response.modelVersion = chunk.model || '';
-
-      yield response;
+      yield createTextResponse(choice.delta.content, chunk);
     }
 
     // 累积工具调用
@@ -399,50 +311,74 @@ async function* convertToGeminiStream(
         continue;
       }
 
-      const response = new GenerateContentResponse();
-      response.candidates = [{
-        content: {
-          role: 'model',
-          parts: [{
-            functionCall: {
-              id: toolCall.id,
-              name: toolCall.name,
-              args: args
-            }
-          }]
-        },
-        finishReason: mapFinishReason('tool_calls'),
-        index: 0,
-        safetyRatings: []
-      }];
-
-      response.createTime = new Date().toISOString();
-      response.responseId = lastChunk?.id || `response-${Date.now()}`;
-      response.modelVersion = lastChunk?.model || 'qwen-plus-latest';
-
-      yield response;
+      yield createToolCallResponse(toolCall, args, lastChunk);
     }
   }
 
   // 如果只有结束信号，生成结束响应
   if (!hasContent && toolCallAccumulator.size === 0 && openAIFinishReason) {
-    const response = new GenerateContentResponse();
-    response.candidates = [{
-      content: {
-        parts: [],
-        role: 'model'
-      },
-      index: 0,
-      finishReason: mapFinishReason(openAIFinishReason),
-      safetyRatings: []
-    }];
-
-    response.createTime = new Date().toISOString();
-    response.responseId = lastChunk?.id || `response-${Date.now()}`;
-    response.modelVersion = lastChunk?.model || 'qwen-plus-latest';
-
-    yield response;
+    yield createEndResponse(openAIFinishReason, lastChunk);
   }
+}
+
+// 辅助函数：创建文本响应
+function createTextResponse(content: string, chunk: any): GenerateContentResponse {
+  const response = new GenerateContentResponse();
+  response.candidates = [{
+    content: {
+      parts: [{ text: content }],
+      role: 'model'
+    },
+    index: 0,
+    finishReason: chunk.choices?.[0]?.finish_reason ? mapFinishReason(chunk.choices[0].finish_reason) : undefined,
+    safetyRatings: []
+  }];
+  response.createTime = new Date().toISOString();
+  response.responseId = chunk.id || '';
+  response.modelVersion = chunk.model || '';
+  return response;
+}
+
+// 辅助函数：创建工具调用响应
+function createToolCallResponse(toolCall: any, args: any, lastChunk: any): GenerateContentResponse {
+  const response = new GenerateContentResponse();
+  response.candidates = [{
+    content: {
+      role: 'model',
+      parts: [{
+        functionCall: {
+          id: toolCall.id,
+          name: toolCall.name,
+          args: args
+        }
+      }]
+    },
+    finishReason: mapFinishReason('tool_calls'),
+    index: 0,
+    safetyRatings: []
+  }];
+  response.createTime = new Date().toISOString();
+  response.responseId = lastChunk?.id || `response-${Date.now()}`;
+  response.modelVersion = lastChunk?.model || 'qwen-plus-latest';
+  return response;
+}
+
+// 辅助函数：创建结束响应
+function createEndResponse(finishReason: string, lastChunk: any): GenerateContentResponse {
+  const response = new GenerateContentResponse();
+  response.candidates = [{
+    content: {
+      parts: [],
+      role: 'model'
+    },
+    index: 0,
+    finishReason: mapFinishReason(finishReason),
+    safetyRatings: []
+  }];
+  response.createTime = new Date().toISOString();
+  response.responseId = lastChunk?.id || `response-${Date.now()}`;
+  response.modelVersion = lastChunk?.model || 'qwen-plus-latest';
+  return response;
 }
 
 function mapFinishReason(openAIReason: string): FinishReason | undefined {
@@ -572,42 +508,32 @@ export class CodeAssistServer implements ContentGenerator {
     req: GenerateContentParameters,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
 
+    const cache = getEnvCache();
     const openai = new OpenAI({
-      apiKey: process.env.CUSTOM_API_KEY || "",
-      baseURL: process.env.CUSTOM_BASE_URL || ""
+      apiKey: cache.CUSTOM_API_KEY,
+      baseURL: cache.CUSTOM_BASE_URL
     });
 
     const openApiReq = toGenerateContentRequest(req, this.projectId);
-    const messages: Array<ChatCompletionMessageParam> = [];
+    openApiReq.model = cache.CUSTOM_MODEL_NAME;
 
-    openApiReq.model = process.env.CUSTOM_MODEL_NAME || ""
+    writeDebugLog(`Raw RequestParams ${JSON.stringify(openApiReq)}`);
 
-    fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] Raw RequestParams ${JSON.stringify(openApiReq)}\n`);
-
-    openApiReq.request.contents.forEach((content) => {
-      if (content.role === "user") {
-        messages.push({
-          role: "user",
-          content: content.parts?.map(p => p.text).join('\n') || ''
-        });
-      }
-    })
-
-    const tools = convertGeminiToolsToOpenAI(openApiReq.request.tools)
+    const tools = convertGeminiToolsToOpenAI(openApiReq.request.tools);
     const requestParams: any = {
-      model: process.env.CUSTOM_MODEL_NAME,
+      model: cache.CUSTOM_MODEL_NAME,
       messages: convertGeminiRequestToOpenAI(openApiReq),
       ...(tools && tools.length > 0 && { tools }),
-      temperature : openApiReq.request.generationConfig?.temperature,
-      top_p : openApiReq.request.generationConfig?.topP,
-      stream : true,
+      temperature: openApiReq.request.generationConfig?.temperature,
+      top_p: openApiReq.request.generationConfig?.topP,
+      stream: true,
     };
 
-    fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] RequestParams ${JSON.stringify(requestParams)}\n`);
+    writeDebugLog(`RequestParams ${JSON.stringify(requestParams)}`);
 
     const completion = await openai.chat.completions.create(requestParams);
     // @ts-ignore
-    return  convertToGeminiStream(completion);
+    return convertToGeminiStream(completion);
   }
 
 
@@ -626,34 +552,19 @@ export class CodeAssistServer implements ContentGenerator {
     req: GenerateContentParameters,
   ): Promise<GenerateContentResponse> {
 
+    const cache = getEnvCache();
     const openai = new OpenAI({
-      apiKey: process.env.CUSTOM_API_KEY || "",
-      baseURL: process.env.CUSTOM_BASE_URL || ""
+      apiKey: cache.CUSTOM_API_KEY,
+      baseURL: cache.CUSTOM_BASE_URL
     });
 
     const openApiReq = toGenerateContentRequest(req, this.projectId);
-    const messages: Array<ChatCompletionMessageParam> = [];
 
-    fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] [generateContent] Raw RequestParams ${JSON.stringify(openApiReq)}\n`);
+    writeDebugLog(`[generateContent] Raw RequestParams ${JSON.stringify(openApiReq)}`);
 
-    // 转换消息历史
-    openApiReq.request.contents.forEach((content) => {
-      if (content.role === "user") {
-        messages.push({
-          role: "user",
-          content: content.parts?.map(p => p.text).join('') || ''
-        });
-      } else if (content.role === "model") {
-        messages.push({
-          role: "assistant",
-          content: content.parts?.map(p => p.text).join('') || ''
-        });
-      }
-    });
-
-    const tools = convertGeminiToolsToOpenAI(openApiReq.request.tools)
+    const tools = convertGeminiToolsToOpenAI(openApiReq.request.tools);
     const requestParams: any = {
-      model: process.env.CUSTOM_MODEL_NAME,
+      model: cache.CUSTOM_MODEL_NAME,
       messages: convertGeminiRequestToOpenAI(openApiReq),
       ...(tools && tools.length > 0 && { tools }),
       temperature: openApiReq.request.generationConfig?.temperature,
@@ -661,17 +572,16 @@ export class CodeAssistServer implements ContentGenerator {
       stream: false,
     };
 
-    fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] [generateContent] RequestParams ${JSON.stringify(requestParams)}\n`);
+    writeDebugLog(`[generateContent] RequestParams ${JSON.stringify(requestParams)}`);
 
     try {
       const completion = await openai.chat.completions.create(requestParams);
 
-      fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] [generateContent] OpenAI Response ${JSON.stringify(completion)}\n`);
+      writeDebugLog(`[generateContent] OpenAI Response ${JSON.stringify(completion)}`);
 
-      // 转换非流式响应到 Gemini 格式
       return convertToGeminiResponse(completion);
     } catch (error) {
-      fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] [generateContent] Error: ${error}\n`);
+      writeDebugLog(`[generateContent] Error: ${error}`);
       throw error;
     }
   }
