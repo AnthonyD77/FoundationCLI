@@ -35,6 +35,7 @@ export function AuthDialog({
     },
     { label: 'Gemini API Key', value: AuthType.USE_GEMINI },
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    { label: 'Custom Model', value: AuthType.USE_CUSTOM_MODEL },
   ];
 
   let initialAuthIndex = items.findIndex(

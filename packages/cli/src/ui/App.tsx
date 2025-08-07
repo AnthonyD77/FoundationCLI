@@ -89,9 +89,10 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const { stdout } = useStdout();
 
-  useEffect(() => {
-    checkForUpdates().then(setUpdateMessage);
-  }, []);
+  // -- turn off update check
+  // useEffect(() => {
+  //   checkForUpdates().then(setUpdateMessage);
+  // }, []);
 
   const { history, addItem, clearItems, loadHistory } = useHistory();
   const {
@@ -432,10 +433,14 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
     (submittedValue: string) => {
       const trimmedValue = submittedValue.trim();
       if (trimmedValue.length > 0) {
+        addItem({
+          type: MessageType.INFO,
+          // text: `[DEBUG] UserInput: ${trimmedValue}`
+        }, Date.now());
         submitQuery(trimmedValue);
       }
     },
-    [submitQuery],
+    [submitQuery, addItem],
   );
 
   const logger = useLogger();
@@ -745,7 +750,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
                     </Text>
                   ) : (
                     <ContextSummaryDisplay
-                      geminiMdFileCount={geminiMdFileCount}
+                      geminiMdFileCount={0}
                       contextFileNames={contextFileNames}
                       mcpServers={config.getMcpServers()}
                       showToolDescriptions={showToolDescriptions}
@@ -826,7 +831,7 @@ const App = ({ config, settings, startupWarnings = [] }: AppProps) => {
             </Box>
           )}
           <Footer
-            model={currentModel}
+            model={process.env.CUSTOM_MODEL_NAME || ""}
             targetDir={config.getTargetDir()}
             debugMode={config.getDebugMode()}
             branchName={branchName}

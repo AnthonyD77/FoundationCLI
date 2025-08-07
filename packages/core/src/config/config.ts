@@ -40,6 +40,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import fs from 'fs';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -249,6 +250,9 @@ export class Config {
     const gc = new GeminiClient(this);
     this.geminiClient = gc;
     this.toolRegistry = await createToolRegistry(this);
+    // const registeredTools = this.toolRegistry.getAllTools?.() || [];
+    // const toolNames = registeredTools.map(tool => tool.name || tool.constructor.name);
+    // fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] Registered tools: ${JSON.stringify(toolNames)}\n`);
     await gc.initialize(contentConfig);
     this.contentGeneratorConfig = contentConfig;
 

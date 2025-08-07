@@ -16,7 +16,7 @@ export interface RetryOptions {
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
-  maxAttempts: 5,
+  maxAttempts: 1,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
   shouldRetry: defaultShouldRetry,
@@ -30,16 +30,16 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
  */
 function defaultShouldRetry(error: Error | unknown): boolean {
   // Check for common transient error status codes either in message or a status property
-  if (error && typeof (error as { status?: number }).status === 'number') {
-    const status = (error as { status: number }).status;
-    if (status === 429 || (status >= 500 && status < 600)) {
-      return true;
-    }
-  }
-  if (error instanceof Error && error.message) {
-    if (error.message.includes('429')) return true;
-    if (error.message.match(/5\d{2}/)) return true;
-  }
+  // if (error && typeof (error as { status?: number }).status === 'number') {
+  //   const status = (error as { status: number }).status;
+  //   if (status === 429 || (status >= 500 && status < 600)) {
+  //     return true;
+  //   }
+  // }
+  // if (error instanceof Error && error.message) {
+  //   if (error.message.includes('429')) return true;
+  //   if (error.message.match(/5\d{2}/)) return true;
+  // }
   return false;
 }
 
@@ -59,10 +59,14 @@ function delay(ms: number): Promise<void> {
  * @returns A promise that resolves with the result of the function if successful.
  * @throws The last error encountered if all attempts fail.
  */
+
+import fs from 'fs';
+
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   options?: Partial<RetryOptions>,
 ): Promise<T> {
+
   const {
     maxAttempts,
     initialDelayMs,
@@ -86,6 +90,8 @@ export async function retryWithBackoff<T>(
     } catch (error) {
       const errorStatus = getErrorStatus(error);
 
+      fs.appendFileSync('debug-llm-api.log', `[${new Date().toISOString()}] Retry error ${JSON.stringify(error)}\n`);
+
       // Track consecutive 429 errors
       if (errorStatus === 429) {
         consecutive429Count++;
@@ -93,27 +99,27 @@ export async function retryWithBackoff<T>(
         consecutive429Count = 0;
       }
 
-      // If we have persistent 429s and a fallback callback for OAuth
-      if (
-        consecutive429Count >= 2 &&
-        onPersistent429 &&
-        authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL
-      ) {
-        try {
-          const fallbackModel = await onPersistent429(authType);
-          if (fallbackModel) {
-            // Reset attempt counter and try with new model
-            attempt = 0;
-            consecutive429Count = 0;
-            currentDelay = initialDelayMs;
-            // With the model updated, we continue to the next attempt
-            continue;
-          }
-        } catch (fallbackError) {
-          // If fallback fails, continue with original error
-          console.warn('Fallback to Flash model failed:', fallbackError);
-        }
-      }
+      // // If we have persistent 429s and a fallback callback for OAuth
+      // if (
+      //   consecutive429Count >= 2 &&
+      //   onPersistent429 &&
+      //   authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL
+      // ) {
+      //   try {
+      //     const fallbackModel = await onPersistent429(authType);
+      //     if (fallbackModel) {
+      //       // Reset attempt counter and try with new model
+      //       attempt = 0;
+      //       consecutive429Count = 0;
+      //       currentDelay = initialDelayMs;
+      //       // With the model updated, we continue to the next attempt
+      //       continue;
+      //     }
+      //   } catch (fallbackError) {
+      //     // If fallback fails, continue with original error
+      //     console.warn('Fallback to Flash model failed:', fallbackError);
+      //   }
+      // }
 
       // Check if we've exhausted retries or shouldn't retry
       if (attempt >= maxAttempts || !shouldRetry(error as Error)) {

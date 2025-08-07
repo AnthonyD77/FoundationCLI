@@ -182,6 +182,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
 
   // Load user settings
   try {
+    console.log(`Loading settings from ${USER_SETTINGS_PATH}`)
     if (fs.existsSync(USER_SETTINGS_PATH)) {
       const userContent = fs.readFileSync(USER_SETTINGS_PATH, 'utf-8');
       const parsedUserSettings = JSON.parse(
@@ -208,6 +209,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     'settings.json',
   );
 
+  // there is no workspace settings
   // Load workspace settings
   try {
     if (fs.existsSync(workspaceSettingsPath)) {
